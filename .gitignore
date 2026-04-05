@@ -1,0 +1,35 @@
+# Project
+.agent-skills-setup/
+
+
+# General
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+*.swp
+*.swo
+
+.env
+.env.*
+
+__pycache__/
+*.py[cod]
+*.pyc.*
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+node_modules/
