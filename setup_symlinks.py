@@ -20,12 +20,13 @@ class AgentMapping:
 @dataclass
 class AgentResult:
     name: str
+    already_configured: bool = False
+    system_missing: bool = False
     symlink_created: bool = False
-    symlink_already_ok: bool = False
-    copied: List[str] = field(default_factory=list)
-    overwritten: List[str] = field(default_factory=list)
-    skipped: List[str] = field(default_factory=list)
-    restored_pending: List[str] = field(default_factory=list)
+    backup_path: Path | None = None
+    imported_system: List[str] = field(default_factory=list)
+    starter_copied: List[str] = field(default_factory=list)
+    conflicts_preserved: List[str] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
 
@@ -36,19 +37,14 @@ class SetupError(Exception):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Seed native coding-agent skill directories from this repo, "
-            "then replace the repo agent folders with symlinks."
+            "Import current system skill directories into this repo, back them up, "
+            "then replace the system directories with symlinks to the repo."
         )
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite existing same-name skills in the native agent directory.",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Preview actions without changing any files.",
+        help="Preview import, backup, merge, and symlink actions without changing files.",
     )
     return parser.parse_args()
 
@@ -72,25 +68,16 @@ def managed_root(root: Path) -> Path:
     return root / ".agent-skills-setup"
 
 
-def pending_dir(root: Path, agent_name: str) -> Path:
-    return managed_root(root) / "pending" / agent_name
+def backup_dir(root: Path, agent_name: str) -> Path:
+    return managed_root(root) / "backup" / agent_name
+
+
+def conflicts_dir(root: Path, agent_name: str) -> Path:
+    return managed_root(root) / "conflicts" / agent_name
 
 
 def staging_dir(root: Path, agent_name: str) -> Path:
     return managed_root(root) / "staging" / agent_name
-
-
-def list_pending_entries(root: Path) -> List[Path]:
-    pending_root = managed_root(root) / "pending"
-    if not pending_root.exists():
-        return []
-
-    entries: List[Path] = []
-    for agent_dir in sorted(pending_root.iterdir(), key=lambda p: p.name):
-        if not agent_dir.is_dir():
-            continue
-        entries.extend(sorted(agent_dir.iterdir(), key=lambda p: p.name))
-    return entries
 
 
 def ensure_dir(path: Path, dry_run: bool) -> None:
@@ -100,7 +87,7 @@ def ensure_dir(path: Path, dry_run: bool) -> None:
 
 
 def remove_path(path: Path, dry_run: bool) -> None:
-    if dry_run or not path.exists() and not path.is_symlink():
+    if dry_run or (not path.exists() and not path.is_symlink()):
         return
     if path.is_symlink() or path.is_file():
         path.unlink()
@@ -115,9 +102,10 @@ def move_path(src: Path, dst: Path, dry_run: bool) -> None:
     shutil.move(str(src), str(dst))
 
 
-def copy_entry(src: Path, dst: Path, dry_run: bool) -> None:
+def copy_path(src: Path, dst: Path, dry_run: bool) -> None:
     if dry_run:
         return
+    dst.parent.mkdir(parents=True, exist_ok=True)
     if src.is_dir():
         shutil.copytree(src, dst)
     else:
@@ -136,172 +124,195 @@ def iter_entries(path: Path) -> List[Path]:
     return sorted(path.iterdir(), key=lambda p: p.name)
 
 
-def sync_entries(
-    source_dir: Path,
-    target_dir: Path,
-    pending: Path,
+def entry_names(path: Path) -> List[str]:
+    return [entry.name for entry in iter_entries(path)]
+
+
+def describe_merge(
+    repo_path: Path,
+    system_path: Path,
+    result: AgentResult,
+    conflicts_path: Path,
+) -> None:
+    system_exists = system_path.exists()
+    repo_entries = entry_names(repo_path)
+    system_entries = entry_names(system_path)
+
+    result.imported_system.extend(system_entries)
+
+    system_entry_names = set(system_entries)
+    for entry_name in repo_entries:
+        if entry_name in system_entry_names:
+            result.conflicts_preserved.append(entry_name)
+        else:
+            result.starter_copied.append(entry_name)
+
+    if system_entries:
+        result.notes.append(
+            f"Import the current system skills into the repo before linking {system_path}."
+        )
+    elif system_exists:
+        result.notes.append(
+            f"{system_path} already exists but is empty. Setup will back it up and then link it "
+            "to the repo folder."
+        )
+    else:
+        result.notes.append(
+            "No existing system skills directory was found. Setup will create an empty repo "
+            "folder before linking the system path."
+        )
+
+    if result.conflicts_preserved:
+        result.notes.append(
+            f"Preserve conflicting repo skills under {conflicts_path} for later review."
+        )
+
+
+def merge_staged_repo(
+    staged_repo: Path,
+    live_repo: Path,
+    conflicts_path: Path,
     result: AgentResult,
     *,
-    force: bool,
     dry_run: bool,
-    label: str,
 ) -> None:
-    if not source_dir.exists():
+    if not staged_repo.exists():
         return
 
-    for entry in iter_entries(source_dir):
-        target_entry = target_dir / entry.name
-        pending_entry = pending / entry.name
+    for entry in iter_entries(staged_repo):
+        live_entry = live_repo / entry.name
+        conflict_entry = conflicts_path / entry.name
 
-        if target_entry.exists() or target_entry.is_symlink():
-            if force:
-                result.overwritten.append(entry.name)
-                remove_path(target_entry, dry_run)
-                copy_entry(entry, target_entry, dry_run)
-                remove_path(pending_entry, dry_run)
-            else:
-                result.skipped.append(entry.name)
-                ensure_dir(pending, dry_run)
-                remove_path(pending_entry, dry_run)
-                copy_entry(entry, pending_entry, dry_run)
-                result.notes.append(
-                    f"Skipped existing {label} '{entry.name}' and preserved the repo copy in "
-                    f"{pending_entry}"
-                )
+        if live_entry.exists() or live_entry.is_symlink():
+            remove_path(conflict_entry, dry_run)
+            ensure_dir(conflicts_path, dry_run)
+            copy_path(entry, conflict_entry, dry_run)
             continue
 
-        result.copied.append(entry.name)
-        copy_entry(entry, target_entry, dry_run)
-        remove_path(pending_entry, dry_run)
+        copy_path(entry, live_entry, dry_run)
 
 
-def restore_pending_entries(
-    pending: Path,
-    target_dir: Path,
-    result: AgentResult,
+def rollback_agent(
+    repo_path: Path,
+    system_path: Path,
+    staging_path: Path,
+    backup_path: Path,
     *,
-    force: bool,
-    dry_run: bool,
+    repo_existed_before: bool,
+    system_removed: bool,
+    system_symlink_created: bool,
+    repo_rebuilt: bool,
 ) -> None:
-    if not pending.exists():
-        return
+    if system_removed or system_symlink_created:
+        remove_path(system_path, dry_run=False)
+        if backup_path.exists():
+            copy_path(backup_path, system_path, dry_run=False)
 
-    for entry in iter_entries(pending):
-        target_entry = target_dir / entry.name
-        if target_entry.exists() or target_entry.is_symlink():
-            if force:
-                result.restored_pending.append(entry.name)
-                remove_path(target_entry, dry_run)
-                copy_entry(entry, target_entry, dry_run)
-                remove_path(entry, dry_run)
-            else:
-                result.notes.append(
-                    f"Pending repo copy for '{entry.name}' is still preserved in {entry}"
-                )
-            continue
+    if repo_rebuilt:
+        remove_path(repo_path, dry_run=False)
 
-        result.restored_pending.append(entry.name)
-        copy_entry(entry, target_entry, dry_run)
-        remove_path(entry, dry_run)
-
-    if dry_run:
-        return
-
-    for current in [pending, pending.parent]:
-        try:
-            current.rmdir()
-        except OSError:
-            break
+    if repo_existed_before and staging_path.exists():
+        move_path(staging_path, repo_path, dry_run=False)
 
 
 def bootstrap_agent(
     mapping: AgentMapping,
     root: Path,
     *,
-    force: bool,
     dry_run: bool,
 ) -> AgentResult:
     result = AgentResult(name=mapping.name)
     repo_path = mapping.repo_path
     system_path = mapping.system_path
-    pending = pending_dir(root, mapping.name)
-    staging = staging_dir(root, mapping.name)
-
-    repo_exists = repo_path.exists() or repo_path.is_symlink()
-
-    ensure_dir(system_path.parent, dry_run)
-    ensure_dir(system_path, dry_run)
+    backup_path = backup_dir(root, mapping.name)
+    conflicts_path = conflicts_dir(root, mapping.name)
+    staging_path = staging_dir(root, mapping.name)
 
     if repo_path.is_symlink():
-        target = repo_path.resolve()
-        if target != system_path.resolve():
-            raise SetupError(
-                f"{repo_path} is already a symlink to {target}, expected {system_path}"
-            )
-        result.symlink_already_ok = True
-        restore_pending_entries(
-            pending,
-            system_path,
-            result,
-            force=force,
-            dry_run=dry_run,
+        raise SetupError(
+            f"{repo_path} is a symlink. This setup expects repo-owned folders. "
+            "Clone a fresh repo or replace the symlink with a real directory first."
         )
+
+    if repo_path.exists() and not repo_path.is_dir():
+        raise SetupError(f"{repo_path} exists but is not a directory")
+
+    if system_path.is_symlink():
+        if system_path.resolve() == repo_path.resolve():
+            result.already_configured = True
+            result.notes.append("System skills directory already points to this repo.")
+            return result
+        raise SetupError(
+            f"{system_path} is already a symlink to {system_path.resolve()}, expected {repo_path}"
+        )
+
+    if system_path.exists() and not system_path.is_dir():
+        raise SetupError(f"{system_path} exists but is not a directory")
+
+    result.system_missing = not system_path.exists()
+    if not result.system_missing:
+        result.backup_path = backup_path
+
+    describe_merge(repo_path, system_path, result, conflicts_path)
+    result.symlink_created = True
+
+    if result.backup_path is not None:
+        result.notes.append(
+            f"Keep the backup at {result.backup_path} until you verify setup worked."
+        )
+
+    if dry_run:
         return result
 
-    staged_repo_contents = False
-    original_repo_missing = not repo_exists
-    staged_source: Path | None = None
+    repo_existed_before = repo_path.exists()
+    system_removed = False
+    system_symlink_created = False
+    repo_rebuilt = False
 
     try:
-        if repo_exists:
-            if not repo_path.is_dir():
-                raise SetupError(f"{repo_path} exists but is not a directory")
-            remove_path(staging, dry_run)
-            move_path(repo_path, staging, dry_run)
-            staged_repo_contents = True
-            staged_source = repo_path if dry_run else staging
+        remove_path(staging_path, dry_run=False)
+        if repo_existed_before:
+            move_path(repo_path, staging_path, dry_run=False)
 
-        create_symlink(repo_path, system_path, dry_run)
-        result.symlink_created = True
+        repo_rebuilt = True
+        if system_path.exists():
+            remove_path(backup_path, dry_run=False)
+            copy_path(system_path, backup_path, dry_run=False)
+            copy_path(system_path, repo_path, dry_run=False)
+        else:
+            ensure_dir(repo_path, dry_run=False)
 
-        if staged_repo_contents:
-            sync_entries(
-                staged_source,
-                system_path,
-                pending,
+        if repo_existed_before:
+            remove_path(conflicts_path, dry_run=False)
+            merge_staged_repo(
+                staging_path,
+                repo_path,
+                conflicts_path,
                 result,
-                force=force,
-                dry_run=dry_run,
-                label=f"{mapping.name} skill",
+                dry_run=False,
             )
+            remove_path(staging_path, dry_run=False)
 
-        restore_pending_entries(
-            pending,
-            system_path,
-            result,
-            force=force,
-            dry_run=dry_run,
-        )
+        ensure_dir(system_path.parent, dry_run=False)
+        if system_path.exists() or system_path.is_symlink():
+            remove_path(system_path, dry_run=False)
+            system_removed = True
 
-        if staged_repo_contents:
-            remove_path(staging, dry_run)
-
-        if original_repo_missing:
-            result.notes.append("Created a new repo symlink because no repo folder existed yet.")
-
+        create_symlink(system_path, repo_path, dry_run=False)
+        system_symlink_created = True
         return result
     except Exception as exc:
-        if dry_run:
-            raise
-
-        if staged_repo_contents and staging.exists() and not repo_path.exists():
-            try:
-                move_path(staging, repo_path, dry_run=False)
-            except Exception as rollback_exc:  # pragma: no cover - defensive cleanup
-                raise SetupError(
-                    f"{exc} (rollback also failed: {rollback_exc})"
-                ) from rollback_exc
-        raise
+        rollback_agent(
+            repo_path,
+            system_path,
+            staging_path,
+            backup_path,
+            repo_existed_before=repo_existed_before,
+            system_removed=system_removed,
+            system_symlink_created=system_symlink_created,
+            repo_rebuilt=repo_rebuilt,
+        )
+        raise SetupError(f"Failed while setting up {mapping.name}: {exc}") from exc
 
 
 def print_plan(mapping: AgentMapping, result: AgentResult, *, dry_run: bool) -> None:
@@ -310,18 +321,22 @@ def print_plan(mapping: AgentMapping, result: AgentResult, *, dry_run: bool) -> 
     print(f"  repo path:   {mapping.repo_path}")
     print(f"  system path: {mapping.system_path}")
 
-    if result.symlink_created:
-        print("  symlink: create repo folder symlink to system skills dir")
-    if result.symlink_already_ok:
+    if result.already_configured:
         print("  symlink: already configured")
-    if result.copied:
-        print(f"  copied: {', '.join(result.copied)}")
-    if result.overwritten:
-        print(f"  overwritten: {', '.join(result.overwritten)}")
-    if result.restored_pending:
-        print(f"  restored pending: {', '.join(result.restored_pending)}")
-    if result.skipped:
-        print(f"  skipped: {', '.join(result.skipped)}")
+    else:
+        print("  symlink: replace system skills dir with a symlink to the repo folder")
+
+    if result.backup_path is not None:
+        verb = "create" if dry_run else "created"
+        print(f"  backup: {verb} at {result.backup_path}")
+
+    if result.imported_system:
+        print(f"  imported system skills: {', '.join(result.imported_system)}")
+    if result.starter_copied:
+        print(f"  starter skills copied in: {', '.join(result.starter_copied)}")
+    if result.conflicts_preserved:
+        print(f"  repo conflicts preserved: {', '.join(result.conflicts_preserved)}")
+
     for note in result.notes:
         print(f"  note: {note}")
 
@@ -330,53 +345,18 @@ def main() -> int:
     args = parse_args()
     root = repo_root()
     mappings = build_mappings(root)
-    pending_before = list_pending_entries(root)
-
-    if args.force and not pending_before:
-        print(
-            'Error: "--force" is only for a follow-up run after a normal setup created pending '
-            "skipped skills.\n"
-            "Run the setup once without --force first. If there are name collisions, the script "
-            "will preserve the repo copies under .agent-skills-setup/pending/ and tell you to "
-            're-run with "--force".',
-            file=sys.stderr,
-        )
-        return 1
-
-    any_skipped = False
+    any_conflicts = False
 
     for mapping in mappings:
-        result = bootstrap_agent(
-            mapping,
-            root,
-            force=args.force,
-            dry_run=args.dry_run,
-        )
+        result = bootstrap_agent(mapping, root, dry_run=args.dry_run)
         print_plan(mapping, result, dry_run=args.dry_run)
         print()
-        any_skipped = any_skipped or bool(result.skipped)
+        any_conflicts = any_conflicts or bool(result.conflicts_preserved)
 
-    if any_skipped:
+    if any_conflicts:
         print(
-            'Some same-name skills were skipped to avoid overwriting local system skills. '
-            'Review them, then re-run this setup with "--force" if you want the repo versions '
-            'to win and clear the pending copies.'
-        )
-
-    pending_after = list_pending_entries(root)
-
-    if args.force and not args.dry_run and pending_after:
-        print(
-            "Error: --force completed but some pending skills still remain:\n"
-            + "\n".join(f"  - {path}" for path in pending_after),
-            file=sys.stderr,
-        )
-        return 1
-
-    if args.force and args.dry_run and pending_before:
-        print(
-            "Dry run note: pending skills were detected, so a real --force run would attempt to "
-            "apply them and clear the pending area."
+            "Some repo starter skills were preserved under .agent-skills-setup/conflicts/. "
+            "Review them manually or with a coding agent after setup."
         )
 
     if args.dry_run:
