@@ -80,19 +80,28 @@ python setup_symlinks.py
 > If the script finds existing repo skills or existing symlinks, it will stop and tell you exactly which paths you need to remove first.
 
 
-## Commit Your Skills
+### 3. Commit Your Skills
 
-After setup, commit your imported skills and future changes to your fork:
+Add this note at the top of your fork's `README.md` for future reference:
+
+```md
+# Agent Skills Monorepo
+
+This repository is a fork of the [ZazenCodes Agent Skills](https://github.com/zazencodes/agent-skills) monorepo project.
+
+My agent skills live here and my agent skill system directories are symlinked to this repo.
+```
+
+Stage and commit the changes:
 
 ```sh
 git status
-git add claude codex copilot cursor gemini
+git add README.md claude codex copilot cursor gemini
 git commit -m "Initial commit of agent skills after setup"
 git push
 ```
 
-Congratulations! You now have your own an agent skills monorepo and you're ready
-to crush the [agentic coding era](https://zazencodes.com/relink).
+Congratulations! You now have your own an agent skills monorepo and you're ready to crush the [agentic coding era](https://zazencodes.com/relink).
 
 ## Additional Documentation
 
@@ -137,4 +146,3 @@ As you work:
 
 Please walk me through the recovery and help me execute it carefully.
 ```
-
