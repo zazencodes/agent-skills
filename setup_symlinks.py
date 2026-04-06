@@ -124,7 +124,7 @@ def describe_repo_state(path: Path) -> str:
     if path.exists() and not path.is_dir():
         return "exists but is not a directory"
     if not path.exists():
-        return "missing"
+        return "✓ empty"
 
     entries = iter_entries(path)
     if not entries:
@@ -147,6 +147,14 @@ def describe_system_state(path: Path) -> str:
 
 def collect_preflight_problems(mappings: list[AgentMapping]) -> list[str]:
     problems: list[str] = []
+    root = mappings[0].repo_path.parent if mappings else repo_root()
+    existing_backup_root = backup_root(root)
+
+    if existing_backup_root.exists() or existing_backup_root.is_symlink():
+        problems.append(
+            f"Remove the existing backups at {existing_backup_root} before running setup again."
+        )
+        problems.append(f"Remove them with: rm -r {existing_backup_root}")
 
     for mapping in mappings:
         repo_path = mapping.repo_path
@@ -253,8 +261,8 @@ def print_intro(root: Path, mappings: list[AgentMapping], *, dry_run: bool) -> N
 
 
 def confirm_or_exit(message: str) -> None:
-    answer = input(f"{message} [y/N]: ").strip().lower()
-    if answer in {"y", "yes"}:
+    answer = input(f"{message} [Y/n]: ").strip().lower()
+    if answer in {"", "y", "yes"}:
         return
 
     print("Setup cancelled. No more changes will be made.")
@@ -433,6 +441,7 @@ def main() -> int:
     print("Setup complete.")
     print(f"Backups are stored under {backup_root(root)}.")
     print("Keep those backups until you have confirmed everything is working.")
+    print(f"Remove the backups with: rm -r {backup_root(root)}")
     return 0
 
 
