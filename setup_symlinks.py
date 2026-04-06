@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-
-from __future__ import annotations
-
 import argparse
 import shutil
 import sys
@@ -47,7 +43,9 @@ def build_mappings(root: Path) -> list[AgentMapping]:
         AgentMapping("codex", root / "codex", home / ".codex" / "skills"),
         AgentMapping("copilot", root / "copilot", home / ".copilot" / "skills"),
         AgentMapping("cursor", root / "cursor", home / ".cursor" / "skills"),
-        AgentMapping("gemini", root / "gemini", home / ".gemini" / "antigravity" / "skills"),
+        AgentMapping(
+            "gemini", root / "gemini", home / ".gemini" / "antigravity" / "skills"
+        ),
     ]
 
 
@@ -180,7 +178,9 @@ def collect_preflight_problems(mappings: list[AgentMapping]) -> list[str]:
     return problems
 
 
-def write_backup_readme(root: Path, mappings: list[AgentMapping], *, dry_run: bool) -> None:
+def write_backup_readme(
+    root: Path, mappings: list[AgentMapping], *, dry_run: bool
+) -> None:
     readme_path = backup_readme_path(root)
 
     if dry_run:
@@ -303,7 +303,9 @@ def setup_agent(mapping: AgentMapping, root: Path) -> None:
             f"{format_entry_names(system_entries)}"
         )
         print(f"I will back that directory up to {agent_backup}.")
-        print(f"I will then copy it into {repo_path} and replace {system_path} with a symlink.")
+        print(
+            f"I will then copy it into {repo_path} and replace {system_path} with a symlink."
+        )
     else:
         print("I did not find an existing system skills directory.")
         print(f"I will create an empty repo folder at {repo_path}.")
@@ -403,18 +405,24 @@ def main() -> int:
             if mapping.system_path.exists():
                 print(f"- {mapping.name}: would back up {mapping.system_path}")
                 print(f"  would copy it into {mapping.repo_path}")
-                print(f"  would replace {mapping.system_path} with a symlink to {mapping.repo_path}")
+                print(
+                    f"  would replace {mapping.system_path} with a symlink to {mapping.repo_path}"
+                )
             else:
                 print(f"- {mapping.name}: no existing system directory found")
                 print(f"  would create an empty repo folder at {mapping.repo_path}")
-                print(f"  would create a symlink at {mapping.system_path} -> {mapping.repo_path}")
+                print(
+                    f"  would create a symlink at {mapping.system_path} -> {mapping.repo_path}"
+                )
 
         print()
         print("Dry run complete. No files were changed.")
         return 0
 
     print("This script will now work through each agent one at a time.")
-    print("For each agent, it may create a backup, import the current system skills into this repo, and then swap the system path to a symlink.")
+    print(
+        "For each agent, it may create a backup, import the current system skills into this repo, and then swap the system path to a symlink."
+    )
     print()
     confirm_or_exit("Start setup?")
     print()
