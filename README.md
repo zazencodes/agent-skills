@@ -23,7 +23,7 @@ When you run `setup_symlinks.py` it will:
 ## This doesn't sound safe
 
 - There are no skills in here. 3rd party skills in a repository like this would be a huge security risk.
-- There is built-in disaster recovery. When you run `setup_symlinks.py` it first creates backups of your current agent skills under `.agent-skills-setup/backup/`.
+- There is built-in [disaster recovery](#backups-and-recovery). When you run `setup_symlinks.py` it first creates backups of your current agent skills under `.agent-skills-setup/backup/`.
 
 ## Supported Agent Mappings
 
@@ -111,12 +111,30 @@ If anything fails partway through:
 - The script then tells you where the backup folder lives.
 - The backup folder contains a `README.md` with recovery steps.
 
-### Backups And Recovery
+### Backups
 
 Backups are stored under `.agent-skills-setup/backup/`.
 
 - Keep them until you have verified everything is working.
 - Read `.agent-skills-setup/backup/README.md` if you need to restore an original system directory.
-- If setup already created symlinks and you want to run it again, remove those symlinks and clean the repo agent folders first.
 
+### Disaster Recovery
+
+If you want an agent to help with disaster recovery, start the agent from the root of this repo and use the following prompt:
+
+```text
+I need help with disaster recovery for this agent-skills monorepo setup.
+
+Please inspect this repository, especially `setup_symlinks.py`, `.agent-skills-setup/backup/README.md`, and `.agent-skills-setup/backup/`.
+
+Assume I most likely want to undo the symlinks and restore my coding-agent system skill directories from the disaster recovery backup, but keep the investigation open ended in case the safest recovery path is different.
+
+As you work:
+- Ask me questions whenever anything is uncertain.
+- Explain your understanding of the current state before making changes.
+- Confirm with me before running any command that changes files, symlinks, or directories.
+- Prefer the safest reversible steps first.
+
+Please walk me through the recovery and help me execute it carefully.
+```
 
