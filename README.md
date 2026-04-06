@@ -2,7 +2,10 @@
 
 A central, version-controlled home for coding agent skills across multiple tools.
 
-> With <3 from [ZazenCodes](https://zazencodes.com/)
+> With ❤️ from [ZazenCodes](https://zazencodes.com/)
+
+> [!NOTE]   
+> This setup currently supports macOS and Linux only.
 
 ## Benefits
 
@@ -20,43 +23,26 @@ When you run `setup_symlinks.py` it will:
 1. Copy your current system skills into this repo.
 2. Replace each system skills directory with a symlink back to the corresponding folder in this repo.
 
-## This doesn't sound safe
-
-- There are no skills in here. 3rd party skills in a repository like this would be a huge security risk.
-- There is built-in [disaster recovery](#backups-and-recovery). When you run `setup_symlinks.py` it first creates backups of your current agent skills under `.agent-skills-setup/backup/`.
-
-## Supported Agent Mappings
-
-
-| Tool | System skill directory | Repo folder |
-| --- | --- | --- |
-| Claude Code | `~/.claude/skills/` | `./claude` |
-| OpenAI Codex | `~/.codex/skills/` | `./codex` |
-| GitHub Copilot | `~/.copilot/skills/` | `./copilot` |
-| Cursor | `~/.cursor/skills/` | `./cursor` |
-| Google Antigravity | `~/.gemini/antigravity/skills/` | `./gemini` |
-
-
 ## Setup
 
-You will use this git repo directly to version control your skills.
+You'll use this Git repository directly to version control your skills.
 
-### 1. Fork and clone your own copy
+### 1. Create and clone your own private copy
 
-Open [this repository on GitHub](https://github.com/zazencodes/agent-skills) and
-click the "Fork" button
+Open [this repository on GitHub](https://github.com/zazencodes/agent-skills) and use
+the ["Use this template" button](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template#creating-a-repository-from-a-template) to create a new private repository in your own
+account or organization.
 
 > [!INFO]   
-> The fork button is beside the "Star" button --- you may as well hit that one too!
+> This button is right next to the "Star" button, so you may as well click that one too ⭐   
+> Thank you. It really helps me out.
 
-Then clone your forked repo:
+Then clone your new private repo:
 
 ```sh
-git clone <your-fork-url>
+git clone <your-private-repo-url>
 cd agent-skills
 ```
-
-You should also make your fork private unless you are comfortable open-sourcing all your skills.
 
 ### 2. Run the setup
 
@@ -82,12 +68,12 @@ python setup_symlinks.py
 
 ### 3. Commit Your Skills
 
-Add this note at the top of your fork's `README.md` for future reference:
+Add this note at the top of your repo's `README.md` for future reference:
 
 ```md
 # Agent Skills Monorepo
 
-This repository is a fork of the [ZazenCodes Agent Skills](https://github.com/zazencodes/agent-skills) monorepo project.
+This repository was created from the [ZazenCodes Agent Skills](https://github.com/zazencodes/agent-skills) template repository.
 
 My agent skills live here and my agent skill system directories are symlinked to this repo.
 ```
@@ -101,16 +87,33 @@ git commit -m "Initial commit of agent skills after setup"
 git push
 ```
 
-Congratulations! You now have your own an agent skills monorepo and you're ready to crush the [agentic coding era](https://zazencodes.com/relink).
+Congratulations! You now have your own agent skills monorepo and you're ready to crush the [agentic coding era](https://zazencodes.com/relink).
 
 ## Additional Documentation
+
+### Is this safe?
+
+- This repository intentionally starts with no skills. Third-party skills in a repository like this would be a huge security risk.
+- There is built-in [disaster recovery](#backups-and-recovery). When you run `setup_symlinks.py` it first creates backups of your current agent skills under `.agent-skills-setup/backup/`.
+
+### Supported Agent Mappings
+
+
+| Tool | System skill directory | Repo folder |
+| --- | --- | --- |
+| Claude Code | `~/.claude/skills/` | `./claude` |
+| OpenAI Codex | `~/.codex/skills/` | `./codex` |
+| GitHub Copilot | `~/.copilot/skills/` | `./copilot` |
+| Cursor | `~/.cursor/skills/` | `./cursor` |
+| Google Antigravity | `~/.gemini/antigravity/skills/` | `./gemini` |
+
 
 ### What Setup Does
 
 For each agent:
 
-- If a system skills directory exists, the script backs it up under `.agent-skills-setup/backup/<agent>/`.
-- If a system skills directory exists, the script copies it into the matching repo folder.
+- If the system skills directory exists, the script backs it up under `.agent-skills-setup/backup/<agent>/`.
+- It then copies that directory into the matching repo folder.
 - If a system skills directory does not exist, the script creates an empty repo folder for that agent.
 - The script replaces the system skills directory with a symlink pointing back to the repo folder.
 
