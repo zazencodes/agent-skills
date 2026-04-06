@@ -6,19 +6,27 @@ A central, version-controlled home for coding agent skills across multiple tools
 
 ## Benefits
 
-- You can keep your agent skills in this repo for version control.
-- Each agent still reads its skills from its normal system directory.
-- The repo paths and system paths stay in sync, so you can add, remove, or edit skills from either location.
+- Keep all your agent skills for different tools in one Git repo.
+- Your agents use those skills automatically, with no extra configuration.
+- Changes stay in sync everywhere and are easy to version control:
+    - Edit skills in this repo
+    - Or edit them in the system skill folders
+    - Either way, you're changing the same files
 
-## How it works
+## How It Works
 
-- The real skill files live in this repo under `./claude`, `./codex`, and the other top-level agent folders.
-- `setup_symlinks.py` imports your current system skill directories into those repo folders.
-- The script creates a backup of each original system skill directory under `.agent-skills-setup/backup/`.
-- It then replaces each system skill directory with a symlink back to the matching repo folder.
-- After setup, editing either path updates the same files.
+When you run `setup_symlinks.py` it will:
 
-## Agent mapping
+1. Copy your current system skills into this repo.
+2. Replace each system skills directory with a symlink back to the corresponding folder in this repo.
+
+## This doesn't sound safe
+
+- There are no skills in here. 3rd party skills in a repository like this would be a huge security risk.
+- There is built-in disaster recovery. When you run `setup_symlinks.py` it first creates backups of your current agent skills under `.agent-skills-setup/backup/`.
+
+## Supported Agent Mappings
+
 
 | Tool | System skill directory | Repo folder |
 | --- | --- | --- |
@@ -28,106 +36,87 @@ A central, version-controlled home for coding agent skills across multiple tools
 | Cursor | `~/.cursor/skills/` | `./cursor` |
 | Google Antigravity | `~/.gemini/antigravity/skills/` | `./gemini` |
 
+
 ## Setup
 
-This repo is meant to be forked and used from your own GitHub account.
+You will use this git repo directly to version control your skills.
 
 ### 1. Fork and clone your own copy
 
-Fork this repo on GitHub, then clone your fork:
+Open [this repository on GitHub](https://github.com/zazencodes/agent-skills) and
+click the "Fork" button
+
+> [!INFO]   
+> The fork button is beside the "Star" button --- you may as well hit that one too!
+
+Then clone your forked repo:
 
 ```sh
 git clone <your-fork-url>
 cd agent-skills
 ```
 
-### 2. Decide whether to keep the starter skills
+You should also make your fork private unless you are comfortable open-sourcing all your skills.
 
-This repo can include starter skills as examples. You can keep any existing repo skills, learn from them, or remove them before setup.
+### 2. Run the setup
 
-If you want a blank repo for your own skills, run:
-
-```sh
-python3 clear_repo_skills.py --dry-run
-python3 clear_repo_skills.py
-```
-
-Run `clear_repo_skills.py` only before setup. It refuses to run after the repo folders become live symlink targets.
-
-### 3. Preview the setup
+> [!CAUTION]   
+> After running this script, your agent skills will live here in this repo. Your system skills directories will become symlinks. It's not dangerous, but it's important for you to understand this.
 
 ```sh
-python3 setup_symlinks.py --dry-run
+# Run the preview
+python setup_symlinks.py --dry-run
+
+# Run the setup
+python setup_symlinks.py
 ```
 
-### 4. Run the setup
+> [!NOTE]   
+> Before setup:
+> 
+> - `claude/`, `codex/`, `copilot/`, `cursor/`, and `gemini/` should be missing or empty.
+> - None of the system skill directories should already be symlinks.
+> 
+> If the script finds existing repo skills or existing symlinks, it will stop and tell you exactly which paths you need to remove first.
 
-```sh
-python3 setup_symlinks.py
-```
-
-### What setup does
-
-- Moves the current repo skills for each agent into `.agent-skills-setup/staging/<agent>/`.
-- Copies your current system skill directory into the repo.
-- Backs up the original system skill directory under `.agent-skills-setup/backup/<agent>/`.
-- Copies non-conflicting starter skills back into the repo.
-- Preserves conflicting starter skills under `.agent-skills-setup/conflicts/<agent>/`.
-- Replaces the system skill directory with a symlink to the repo folder.
-
-### 5. Review any preserved conflicts
-
-If a skill exists in both places with the same name:
-
-- The current system skill stays live.
-- The repo copy is preserved under `.agent-skills-setup/conflicts/<agent>/`.
-- You can merge it manually or use a coding agent.
-
-## Conflict Help
-
-Paste this prompt into Codex or Claude Code if you want help reviewing preserved conflicts:
-
-```text
-I just ran setup on my Agent Skills Monorepo and I have preserved skill conflicts.
-
-Please review the skills under `.agent-skills-setup/conflicts/` and compare them with the live skills in the matching repo folders (`claude/`, `codex/`, `copilot/`, `cursor/`, `gemini/`).
-
-For each conflicting skill:
-- treat the live repo version as the source of truth unless I approve a change
-- inspect the conflict copy for anything useful
-- merge useful content into the live skill carefully
-- keep the skill format valid for that tool
-- summarize the changes you made
-- tell me which conflict copies are safe to delete afterward
-
-Work one conflict at a time.
-```
-
-Manual fallback:
-
-- Compare each folder under `.agent-skills-setup/conflicts/<agent>/` with the matching live skill folder in the repo.
-- Copy across any changes you want to keep.
-- Delete the conflict copy when you are done with it.
-
-## Backups
-
-Backups are stored under `.agent-skills-setup/backup/<agent>/`.
-
-Keep them until you confirm the setup worked correctly, then delete them yourself.
 
 ## Commit Your Skills
 
 After setup, commit your imported skills and future changes to your fork:
 
 ```sh
+git status
 git add claude codex copilot cursor gemini
-git commit -m "Import my agent skills"
+git commit -m "Initial commit of agent skills after setup"
 git push
 ```
 
-## Notes
+Congratulations! You now have your own an agent skills monorepo and you're ready
+to crush the [agentic coding era](https://zazencodes.com/relink).
 
-- After setup, the repo folders remain the real skill folders.
-- The system skill directories become symlinks to the repo folders.
-- Re-running `setup_symlinks.py` on an already configured agent is a no-op.
-- `.agent-skills-setup/` is local setup state and is gitignored.
+## Additional Documentation
+
+### What Setup Does
+
+For each agent:
+
+- If a system skills directory exists, the script backs it up under `.agent-skills-setup/backup/<agent>/`.
+- If a system skills directory exists, the script copies it into the matching repo folder.
+- If a system skills directory does not exist, the script creates an empty repo folder for that agent.
+- The script replaces the system skills directory with a symlink pointing back to the repo folder.
+
+If anything fails partway through:
+
+- The script prints the real traceback first.
+- The script then tells you where the backup folder lives.
+- The backup folder contains a `README.md` with recovery steps.
+
+### Backups And Recovery
+
+Backups are stored under `.agent-skills-setup/backup/`.
+
+- Keep them until you have verified everything is working.
+- Read `.agent-skills-setup/backup/README.md` if you need to restore an original system directory.
+- If setup already created symlinks and you want to run it again, remove those symlinks and clean the repo agent folders first.
+
+
