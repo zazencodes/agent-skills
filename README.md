@@ -33,8 +33,8 @@ Open [this repository on GitHub](https://github.com/zazencodes/agent-skills) and
 the ["Use this template" button](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template#creating-a-repository-from-a-template) to create a new private repository in your own
 account or organization.
 
-> [!INFO]   
-> This button is right next to the "Star" button, so you may as well click that one too ⭐   
+> [!TIP]   
+> The "Use this template" button is right next to the "Star" button, so you may as well click that one too ⭐   
 > Thank you. It really helps me out.
 
 Then clone your new private repo:
