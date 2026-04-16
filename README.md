@@ -57,15 +57,6 @@ python setup_symlinks.py --dry-run
 python setup_symlinks.py
 ```
 
-> [!NOTE]   
-> Before setup:
-> 
-> - `claude/`, `codex/`, `copilot/`, `cursor/`, and `gemini/` should be missing or empty.
-> - None of the system skill directories should already be symlinks.
-> 
-> If the script finds existing repo skills or existing symlinks, it will stop and tell you exactly which paths you need to remove first.
-
-
 ### 3. Commit Your Skills
 
 Add this note at the top of your repo's `README.md` for future reference:
