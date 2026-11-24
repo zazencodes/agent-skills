@@ -170,3 +170,7 @@ As you work:
 
 Please walk me through the recovery and help me execute it carefully.
 ```
+
+## License
+
+[GPLv3](LICENSE) covers this template and `setup_symlinks.py`. The skills you add to your own copy are yours.
