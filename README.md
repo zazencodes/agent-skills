@@ -2,6 +2,8 @@
 
 A central, version-controlled home for coding agent skills across multiple tools.
 
+> **Part of [zstack](https://github.com/zazencodes/zstack)**, the agentic system I use to run ZazenCodes.
+
 > With ❤️ from [ZazenCodes](https://zazencodes.com/)
 
 > [!NOTE]
